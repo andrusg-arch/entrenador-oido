@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Entrenador de oído absoluto</title>
+<style>
+  :root{
+    --bg:#0f1724;
+    --card:#0b1220;
+    --accent:#22c55e;
+    --muted:#94a3b8;
+    --glass: rgba(255,255,255,0.07);
+  }
+  *{box-sizing:border-box;font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;}
+  body{margin:0;background:linear-gradient(180deg,#071022 0%, #07112b 100%);color:#e6eef8;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+  .card{width:100%;max-width:880px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:12px;padding:20px;box-shadow:0 6px 24px rgba(2,6,23,0.6);}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;}
+  h1{font-size:20px;margin:0;}
+  p.lead{margin:0;color:var(--muted);font-size:13px;}
+  .controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:16px;}
+  select,input[type=range]{background:var(--glass);border:1px solid rgba(255,255,255,0.15);color:inherit;padding:8px;border-radius:8px;}
+  .btn{background:linear-gradient(90deg,#0ea5a5,#06b6d4);border:none;color:#042024;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:600;}
+  .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.15);padding:8px 12px;border-radius:8px;color:var(--muted);cursor:pointer;}
+  .note-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:14px;}
+  .note-btn{
+    background:linear-gradient(180deg, #1e293b, #334155);
+    border:1px solid rgba(255,255,255,0.15);
+    padding:14px;
+    border-radius:10px;
+    font-weight:700;
+    cursor:pointer;
+    color:#f8fafc;
+    transition:all 0.2s ease;
+  }
+  .note-btn:hover{background:linear-gradient(180deg, #2563eb, #1d4ed8);color:white;}
+  .note-btn.correct{outline:3px solid rgba(34,197,94,0.5);background:linear-gradient(180deg, #22c55e, #16a34a);color:#fff;}
+  .note-btn.wrong{outline:3px solid rgba(239,68,68,0.5);background:linear-gradient(180deg, #ef4444, #b91c1c);color:#fff;}
+  .status{display:flex;gap:12px;align-items:center;color:var(--muted);font-size:13px;margin-bottom:8px;}
+  .big{font-size:30px;font-weight:700;}
+  .footer{margin-top:18px;color:var(--muted);font-size:13px;}
+  .small{font-size:12px;color:var(--muted);}
+  .kbd{background:rgba(255,255,255,0.07);padding:4px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);font-weight:700;}
+  .center{display:flex;align-items:center;gap:10px;}
+  .credits{margin-top:14px;font-size:13px;color:#cbd5e1;text-align:center;}
+  .credits a{color:#38bdf8;text-decoration:none;font-weight:600;margin:0 6px;}
+  .credits a:hover{text-decoration:underline;}
+  @media (max-width:520px){
+    .note-grid{grid-template-columns:repeat(2,1fr)}
+  }
+</style>
+</head>
+<body>
+  <main class="card" role="main" aria-labelledby="title">
+    <header>
+      <div>
+        <h1 id="title">Entrenador de oído absoluto</h1>
+        <p class="lead">Escucha una nota aleatoria y elige cuál es. Atajos: N = siguiente, R = reproducir, V = mostrar respuesta.</p>
+      </div>
+      <div class="center">
+        <div class="small">Volumen</div>
+        <input id="volume" type="range" min="0" max="1" step="0.01" value="0.9" aria-label="Volumen" />
+      </div>
+    </header>
+
+    <section class="controls" aria-label="Controles">
+      <label class="small">Octava:
+        <select id="octaveSelect" aria-label="Seleccionar octava base">
+          <option value="3">3</option>
+          <option value="4" selected>4</option>
+          <option value="5">5</option>
+        </select>
+      </label>
+
+      <label class="small">Rango octavas:
+        <select id="octRange" aria-label="Rango de octavas">
+          <option value="0">Sólo octava seleccionada</option>
+          <option value="1" selected>±1 octava</option>
+          <option value="2">±2 octavas</option>
+        </select>
+      </label>
+
+      <label class="small">Forma de onda:
+        <select id="waveform" aria-label="Forma de onda">
+          <option>sine</option>
+          <option>triangle</option>
+          <option>square</option>
+          <option>sawtooth</option>
+        </select>
+      </label>
+
+      <button id="playBtn" class="btn" title="Reproducir nota (R)">Reproducir (R)</button>
+      <button id="nextBtn" class="btn-ghost" title="Siguiente nota (N)">Siguiente (N)</button>
+      <button id="revealBtn" class="btn-ghost" title="Mostrar respuesta (V)">Mostrar respuesta (V)</button>
+      <button id="resetStats" class="btn-ghost" title="Resetear estadísticas">Reset stats</button>
+    </section>
+
+    <div class="status" role="status" aria-live="polite">
+      <div>Nota actual: <span id="currentNote" class="big">—</span></div>
+      <div>| Aciertos: <strong id="correctCount">0</strong></div>
+      <div>| Errores: <strong id="wrongCount">0</strong></div>
+      <div>| Racha: <strong id="streak">0</strong></div>
+    </div>
+
+    <div class="note-grid" id="buttonsArea" aria-label="Opciones de notas">
+      <!-- Botones generados con JS -->
+    </div>
+
+    <div class="footer">
+      <div class="small">Consejo: escucha la nota 2-3 veces antes de responder. Cambia octava o rango para más dificultad.</div>
+      <div class="small">Hecho con WebAudio • Atajos: <span class="kbd">R</span> reproducir • <span class="kbd">N</span> siguiente • <span class="kbd">V</span> revelar</div>
+    </div>
+
+    <div class="credits">
+      Creado por <strong>Andrés Giraldo</strong> <br/>
+      TikTok: <a href="https://www.tiktok.com/@andru_sg" target="_blank">@andru_sg</a> |
+      Instagram: <a href="https://www.instagram.com/andres._.sgiraldo" target="_blank">@andres._.sgiraldo</a>
+    </div>
+  </main>
+
+<script>
+const noteNames = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const buttonsArea = document.getElementById('buttonsArea');
+const playBtn = document.getElementById('playBtn');
+const nextBtn = document.getElementById('nextBtn');
+const revealBtn = document.getElementById('revealBtn');
+const currentNoteLabel = document.getElementById('currentNote');
+const correctCountLabel = document.getElementById('correctCount');
+const wrongCountLabel = document.getElementById('wrongCount');
+const streakLabel = document.getElementById('streak');
+const volumeControl = document.getElementById('volume');
+const waveformSelect = document.getElementById('waveform');
+const octaveSelect = document.getElementById('octaveSelect');
+const octRangeSelect = document.getElementById('octRange');
+const resetStatsBtn = document.getElementById('resetStats');
+
+let audioCtx = null;
+let masterGain = null;
+let current = null;
+let stats = {correct:0, wrong:0, streak:0};
+let answered = false;
+
+noteNames.forEach((n, i) => {
+  const btn = document.createElement('button');
+  btn.className = 'note-btn';
+  btn.textContent = n.replace('#','♯');
+  btn.dataset.index = i;
+  btn.addEventListener('click', () => onGuess(i, btn));
+  buttonsArea.appendChild(btn);
+});
+
+function noteToMidi(noteIndex, octave){return 12 * (octave + 1) + noteIndex;}
+function midiToFreq(m){return 440 * Math.pow(2, (m - 69) / 12);}
+
+function ensureAudio(){
+  if(!audioCtx){
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = parseFloat(volumeControl.value || 0.9);
+    masterGain.connect(audioCtx.destination);
+  }
+}
+
+function playFreq(freq, duration=1.2){
+  ensureAudio();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = waveformSelect.value || 'sine';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(1.0, audioCtx.currentTime + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+  osc.connect(gain);gain.connect(masterGain);
+  osc.start();osc.stop(audioCtx.currentTime + duration + 0.05);
+}
+
+function pickRandomNote(){
+  const baseOct = parseInt(octaveSelect.value,10);
+  const range = parseInt(octRangeSelect.value,10);
+  const octaves = [baseOct];
+  for(let i=1;i<=range;i++){octaves.push(baseOct+i, baseOct-i);}
+  const octFiltered = octaves.filter(o => o>=0 && o<=8);
+  const oct = octFiltered[Math.floor(Math.random()*octFiltered.length)];
+  const noteIndex = Math.floor(Math.random()*12);
+  return {name: noteNames[noteIndex], index: noteIndex, octave: oct, midi: noteToMidi(noteIndex, oct)};
+}
+
+function playCurrent(){if(!current) return;const freq=midiToFreq(current.midi);playFreq(freq,1.0);setTimeout(()=>playFreq(freq,0.9),420);}
+
+function onGuess(noteIndex, btnEl){
+  if(!current || answered) return;
+  answered=true;
+  const isCorrect = noteIndex===current.index;
+  if(isCorrect){btnEl.classList.add('correct');stats.correct++;stats.streak++;}
+  else{
+    btnEl.classList.add('wrong');
+    const correctBtn=[...document.querySelectorAll('.note-btn')].find(b=>+b.dataset.index===current.index);
+    if(correctBtn) correctBtn.classList.add('correct');
+    stats.wrong++;stats.streak=0;
+  }
+  updateStats();
+}
+
+function nextNote(autoPlay=true){
+  document.querySelectorAll('.note-btn').forEach(b=>b.classList.remove('correct','wrong'));
+  current=pickRandomNote();answered=false;currentNoteLabel.textContent='—';
+  if(autoPlay) setTimeout(()=>playCurrent(),80);
+}
+function revealAnswer(){
+  if(!current) return;
+  currentNoteLabel.textContent=`${current.name}${current.octave}`;
+  const btn=[...document.querySelectorAll('.note-btn')].find(b=>+b.dataset.index===current.index);
+  if(btn) btn.classList.add('correct');
+  if(!answered){stats.wrong++;stats.streak=0;updateStats();}
+  answered=true;
+}
+function updateStats(){
+  correctCountLabel.textContent=stats.correct;
+  wrongCountLabel.textContent=stats.wrong;
+  streakLabel.textContent=stats.streak;
+  if(answered&&current) currentNoteLabel.textContent=`${current.name}${current.octave}`;
+  else currentNoteLabel.textContent='—';
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='r'||e.key==='R'){e.preventDefault();playBtn.click();}
+  else if(e.key==='n'||e.key==='N'){e.preventDefault();nextBtn.click();}
+  else if(e.key==='v'||e.key==='V'){e.preventDefault();revealBtn.click();}
+});
+
+playBtn.addEventListener('click',()=>{ensureAudio();if(audioCtx.state==='suspended') audioCtx.resume();if(!current) nextNote(true);else playCurrent();});
+nextBtn.addEventListener('click',()=>{nextNote(true);});
+revealBtn.addEventListener('click',()=>{revealAnswer();});
+resetStatsBtn.addEventListener('click',()=>{stats={correct:0,wrong:0,streak:0};updateStats();});
+volumeControl.addEventListener('input',()=>{if(masterGain) masterGain.gain.value=parseFloat(volumeControl.value);});
+
+nextNote(true);updateStats();
+</script>
+</body>
+</html>
